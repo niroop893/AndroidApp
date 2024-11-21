@@ -2,10 +2,12 @@
 
 package com.weamet
 
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,6 +19,8 @@ import org.json.JSONObject
 class MainActivity : AppCompatActivity() {
 
     private lateinit var progressBar: ProgressBar
+    private lateinit var sharedPreferences: SharedPreferences
+    private var isFahrenheit: Boolean = false // Default to Celsius
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,7 +29,20 @@ class MainActivity : AppCompatActivity() {
         val cityInput: EditText = findViewById(R.id.cityInput)
         val fetchButton: Button = findViewById(R.id.fetchButton)
         val weatherReport: TextView = findViewById(R.id.weatherReport)
+        val unitSwitch: Switch = findViewById(R.id.unitSwitch)
         progressBar = findViewById(R.id.progressBar)
+
+        // Initialize SharedPreferences
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
+        isFahrenheit = sharedPreferences.getBoolean("isFahrenheit", false)
+        unitSwitch.isChecked = isFahrenheit
+        unitSwitch.text = if (isFahrenheit) "Fahrenheit" else "Celsius"
+
+        unitSwitch.setOnCheckedChangeListener { _, isChecked ->
+            isFahrenheit = isChecked
+            sharedPreferences.edit().putBoolean("isFahrenheit", isFahrenheit).apply()
+            unitSwitch.text = if (isFahrenheit) "Fahrenheit" else "Celsius"
+        }
 
         fetchButton.setOnClickListener {
             val cityName = cityInput.text.toString().trim()
@@ -72,11 +89,10 @@ class MainActivity : AppCompatActivity() {
 
                 // Step 2: Fetch weather data
                 val weatherUrl =
-                    "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&daily=precipitation_sum&timezone=auto"
+                    "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true"
                 val weatherResponse = fetchFromUrl(weatherUrl)
                 val weatherJson = JSONObject(weatherResponse)
                 val currentWeather = weatherJson.optJSONObject("current_weather")
-                val dailyWeather = weatherJson.optJSONObject("daily")
 
                 if (currentWeather == null) {
                     withContext(Dispatchers.Main) {
@@ -86,23 +102,18 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                val temperature = currentWeather.optDouble("temperature", Double.NaN)
+                val temperatureCelsius = currentWeather.optDouble("temperature", Double.NaN)
+                val temperature = if (isFahrenheit) convertToFahrenheit(temperatureCelsius) else temperatureCelsius
                 val windSpeed = currentWeather.optDouble("windspeed", Double.NaN)
-                val humidity = currentWeather.optDouble("relative_humidity", Double.NaN) // Hypothetical API field
-                val precipitation = dailyWeather?.optJSONArray("precipitation_sum")?.optDouble(0, Double.NaN)
 
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     weatherReport.text = buildString {
                         append("City: $cityName\n")
-                        if (!temperature.isNaN()) append("Temperature: $temperature°C\n")
+                        if (!temperature.isNaN()) append("Temperature: $temperature ${if (isFahrenheit) "°F" else "°C"}\n")
                         else append("Temperature: Data not available\n")
                         if (!windSpeed.isNaN()) append("Wind Speed: $windSpeed km/h\n")
                         else append("Wind Speed: Data not available\n")
-                        if (!humidity.isNaN()) append("Humidity: $humidity%\n")
-                        else append("Humidity: Data not available\n")
-                        if (precipitation != null && !precipitation.isNaN()) append("Precipitation: $precipitation mm\n")
-                        else append("Precipitation: Data not available\n")
                     }
                 }
             } catch (e: Exception) {
@@ -121,5 +132,9 @@ class MainActivity : AppCompatActivity() {
             if (!response.isSuccessful) throw Exception("Failed to fetch data: ${response.code}")
             return response.body?.string() ?: throw Exception("Empty response")
         }
+    }
+
+    private fun convertToFahrenheit(celsius: Double): Double {
+        return celsius * 9 / 5 + 32
     }
 }

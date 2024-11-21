@@ -17,6 +17,12 @@
         android:layout_height="wrap_content"
         android:text="Fetch Weather" />
 
+    <Switch
+        android:id="@+id/unitSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Celsius" />
+
     <ProgressBar
         android:id="@+id/progressBar"
         android:layout_width="wrap_content"
