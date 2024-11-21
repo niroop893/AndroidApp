@@ -89,7 +89,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Step 2: Fetch weather data
                 val weatherUrl =
-                    "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true"
+                    "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current_weather=true&daily=precipitation_sum&timezone=auto"
                 val weatherResponse = fetchFromUrl(weatherUrl)
                 val weatherJson = JSONObject(weatherResponse)
                 val currentWeather = weatherJson.optJSONObject("current_weather")
@@ -102,10 +102,15 @@ class MainActivity : AppCompatActivity() {
                     return@launch
                 }
 
+                // Retrieve weather data
                 val temperatureCelsius = currentWeather.optDouble("temperature", Double.NaN)
                 val temperature = if (isFahrenheit) convertToFahrenheit(temperatureCelsius) else temperatureCelsius
                 val windSpeed = currentWeather.optDouble("windspeed", Double.NaN)
+                val humidity = currentWeather.optDouble("relative_humidity", Double.NaN) // Hypothetical API field
+                val dailyWeather = weatherJson.optJSONObject("daily")
+                val precipitation = dailyWeather?.optJSONArray("precipitation_sum")?.optDouble(0, Double.NaN)
 
+                // Update UI
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
                     weatherReport.text = buildString {
@@ -114,6 +119,10 @@ class MainActivity : AppCompatActivity() {
                         else append("Temperature: Data not available\n")
                         if (!windSpeed.isNaN()) append("Wind Speed: $windSpeed km/h\n")
                         else append("Wind Speed: Data not available\n")
+                        if (!humidity.isNaN()) append("Humidity: $humidity%\n")
+                        else append("Humidity: Data not available\n")
+                        if (precipitation != null && !precipitation.isNaN()) append("Precipitation: $precipitation mm\n")
+                        else append("Precipitation: Data not available\n")
                     }
                 }
             } catch (e: Exception) {
